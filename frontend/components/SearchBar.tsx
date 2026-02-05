@@ -7,6 +7,7 @@ interface SearchBarProps {
 	onSearch: (query: string) => void;
 	onImageUpload?: (file: File, query?: string) => void;
 	loading: boolean;
+	initialQuery?: string;
 	onFilterToggle?: () => void;
 	isFilterOpen?: boolean;
 }
@@ -15,8 +16,11 @@ export default function SearchBar({
 	onSearch,
 	onImageUpload,
 	loading,
+	initialQuery = "",
+	onFilterToggle,
+	isFilterOpen,
 }: SearchBarProps) {
-	const [query, setQuery] = useState("");
+	const [query, setQuery] = useState(initialQuery);
 	const [showImageModal, setShowImageModal] = useState(false);
 	const [preview, setPreview] = useState<string | null>(null);
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);

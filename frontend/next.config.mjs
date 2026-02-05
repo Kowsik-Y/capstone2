@@ -12,13 +12,14 @@ const nextConfig = {
 		unoptimized: true, // For local images from backend
 	},
 	async rewrites() {
+		const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 		return [
 			{
 				source: "/api/backend/:path*",
-				destination: process.env.NEXT_PUBLIC_API_URL + "/:path*",
+				destination: `${apiUrl}/:path*`,
 			},
 		];
 	},
 };
 
-module.exports = nextConfig;
+export default nextConfig;

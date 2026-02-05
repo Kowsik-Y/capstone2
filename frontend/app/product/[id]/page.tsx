@@ -33,10 +33,13 @@ export default function ProductPage() {
 
 				// Set basic product info from recommendations
 				if (recsData.results.length > 0) {
-					const basicProduct = {
+					const basicProduct: SearchResult = {
 						id: productId,
 						category: recsData.results[0]?.category || "jewellery",
+						image_path: recsData.results[0]?.image_path || "",
 						similarity_score: 1.0,
+						plain_score: null,
+						decoration_score: null,
 					};
 					setProduct(basicProduct);
 				}

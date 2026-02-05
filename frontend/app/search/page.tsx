@@ -3,7 +3,7 @@
 import { Sparkles } from "lucide-react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import FilterControls from "@/components/FilterControls";
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
@@ -15,7 +15,7 @@ import {
 } from "@/lib/api";
 import type { SearchFilters, SearchResponse } from "@/types";
 
-export default function SearchPage() {
+function SearchPageContent() {
 	const searchParams = useSearchParams();
 	const initialQuery = searchParams.get("q") || "";
 
@@ -360,5 +360,13 @@ export default function SearchPage() {
 				)}
 			</div>
 		</div>
+	);
+}
+
+export default function SearchPage() {
+	return (
+		<Suspense fallback={<div>Loading...</div>}>
+			<SearchPageContent />
+		</Suspense>
 	);
 }
