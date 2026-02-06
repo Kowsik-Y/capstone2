@@ -11,7 +11,7 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
-    libgl1-mesa-glx \
+    libgl1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
@@ -21,21 +21,24 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY main.py .
+COPY dependencies.py .
+COPY clip_search.py .
+COPY download_dataset.py .
+COPY routes/ ./routes/
+COPY models/ ./models/
 
 # Create data directory
 RUN mkdir -p /data
 
-# Make startup script executable
-RUN chmod +x start_hf.sh
-
 # Set environment variables
 ENV DATA_ROOT=/data
 ENV DEVICE=cpu
-ENV PORT=8000
+ENV PORT=7860
+ENV PYTHONPATH=/app
 
 # Expose port
-EXPOSE 8000
+EXPOSE 7860
 
-# Run startup script
-CMD ["./start_hf.sh"]
+# Run the FastAPI application directly
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "7860"]

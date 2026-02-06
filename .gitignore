@@ -43,7 +43,4 @@ data/
 
 # Model cache
 .cache/
-models/
 
-# Docker
-.dockerignore
