@@ -23,10 +23,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 COPY dependencies.py .
-COPY clip_search.py .
+COPY config.py .
 COPY download_dataset.py .
 COPY routes/ ./routes/
 COPY models/ ./models/
+COPY search_engine/ ./search_engine/
 
 # Create data directory
 RUN mkdir -p /data

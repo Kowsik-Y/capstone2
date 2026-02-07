@@ -139,7 +139,7 @@ async def upload_image_with_text(
         # Search by image + text if query provided, otherwise just image
         if query and query.strip():
             results = await search_engine.search_by_image_and_text(
-                image, query.strip(), top_k=top_k
+                image, query.strip(), top_k=top_k, detected_type=None
             )
         else:
             results = await search_engine.search_by_image(image, top_k=top_k)

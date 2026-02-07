@@ -11,7 +11,13 @@ import {
 	Search,
 	X,
 } from "lucide-react";
-import { type FormEvent, useEffect, useRef, useState } from "react";
+import {
+	type FormEvent,
+	useCallback,
+	useEffect,
+	useRef,
+	useState,
+} from "react";
 import { getCategories } from "@/lib/api";
 import type { SearchFilters } from "@/types";
 
@@ -128,7 +134,47 @@ export default function SearchBar({
 	const [preview, setPreview] = useState<string | null>(null);
 	const [selectedFile, setSelectedFile] = useState<File | null>(null);
 	const [imageQuery, setImageQuery] = useState("");
+	const [isDragging, setIsDragging] = useState(false);
 	const fileInputRef = useRef<HTMLInputElement>(null);
+
+	const processFile = useCallback((file: File) => {
+		if (file?.type?.startsWith("image/")) {
+			setSelectedFile(file);
+			const reader = new FileReader();
+			reader.onloadend = () => {
+				setPreview(reader.result as string);
+			};
+			reader.readAsDataURL(file);
+		}
+	}, []);
+
+	const handlePaste = useCallback(
+		(e: ClipboardEvent) => {
+			if (!showImageModal) return;
+
+			const items = e.clipboardData?.items;
+			if (!items) return;
+
+			for (let i = 0; i < items.length; i++) {
+				const item = items[i];
+				if (item.type.startsWith("image/")) {
+					const file = item.getAsFile();
+					if (file) {
+						processFile(file);
+						e.preventDefault();
+					}
+				}
+			}
+		},
+		[showImageModal, processFile],
+	);
+
+	useEffect(() => {
+		window.addEventListener("paste", handlePaste);
+		return () => {
+			window.removeEventListener("paste", handlePaste);
+		};
+	}, [handlePaste]);
 
 	const handleSubmit = (e: FormEvent) => {
 		e.preventDefault();
@@ -153,14 +199,69 @@ export default function SearchBar({
 	};
 	const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const file = e.target.files?.[0];
-		if (file?.type?.startsWith("image/")) {
-			setSelectedFile(file);
-			const reader = new FileReader();
-			reader.onloadend = () => {
-				setPreview(reader.result as string);
-			};
-			reader.readAsDataURL(file);
+		if (file) {
+			processFile(file);
 		}
+	};
+
+	const handleDrop = async (e: React.DragEvent) => {
+		e.preventDefault();
+		setIsDragging(false);
+
+		// Try to get file from drop
+		const file = e.dataTransfer.files[0];
+		if (file) {
+			processFile(file);
+			return;
+		}
+
+		// If no file, try to get image URL (when dragging from websites)
+		const imageUrl = e.dataTransfer.getData("text/html");
+		const urlMatch = imageUrl.match(/src="([^"]+)"/);
+		const imageUrlToFetch = urlMatch
+			? urlMatch[1]
+			: e.dataTransfer.getData("text/plain");
+
+		if (!imageUrlToFetch) return;
+
+		// Skip file:// URLs as they can't be fetched due to security restrictions
+		if (imageUrlToFetch.startsWith("file://")) {
+			alert(
+				"Cannot load local files. Please use the file picker or copy/paste the image instead.",
+			);
+			return;
+		}
+
+		// Only try to fetch if it looks like an image URL
+		if (
+			imageUrlToFetch.match(/\.(jpeg|jpg|gif|png|webp)$/i) ||
+			imageUrlToFetch.startsWith("data:image") ||
+			imageUrlToFetch.startsWith("http")
+		) {
+			try {
+				const res = await fetch(imageUrlToFetch, { mode: "cors" });
+				const blob = await res.blob();
+				const file = new File([blob], "dragged-image.jpg", {
+					type: blob.type || "image/jpeg",
+				});
+				processFile(file);
+			} catch (err) {
+				console.error("Failed to fetch dragged image:", err);
+				alert(
+					"Cannot load this image due to security restrictions. Please download it first or use copy/paste instead.",
+				);
+			}
+		}
+	};
+
+	const handleDragOver = (e: React.DragEvent) => {
+		e.preventDefault();
+		setIsDragging(true);
+	};
+
+	const handleDragLeave = (e: React.DragEvent) => {
+		e.preventDefault();
+		setIsDragging(false);
 	};
 
 	const handleImageSearch = () => {
@@ -592,19 +693,33 @@ export default function SearchBar({
 
 						{!preview ? (
 							<div className="space-y-4">
-								<button
-									type="button"
+								<div
+									onDrop={handleDrop}
+									onDragOver={handleDragOver}
+									onDragLeave={handleDragLeave}
 									onClick={() => fileInputRef.current?.click()}
-									className="w-full border-2 border-dashed border-indigo-300 rounded-lg p-8 text-center cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/50 transition-all"
+									onKeyDown={(e) =>
+										e.key === "Enter" && fileInputRef.current?.click()
+									}
+									role="button"
+									tabIndex={0}
+									className={`w-full border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-all ${
+										isDragging
+											? "border-indigo-600 bg-indigo-100 scale-105"
+											: "border-indigo-300 hover:border-indigo-500 hover:bg-indigo-50/50"
+									}`}
 								>
 									<ImageIcon className="w-12 h-12 text-indigo-400 mx-auto mb-3" />
 									<p className="text-gray-700 font-medium mb-1">
-										Click to select an image
+										Drop an image or click to select
 									</p>
 									<p className="text-sm text-gray-500">
 										Find similar jewelry items
 									</p>
-								</button>
+									<p className="text-xs text-indigo-600 mt-2 font-medium">
+										💡 You can also paste with Ctrl+V (Cmd+V on Mac)
+									</p>
+								</div>
 								<input
 									ref={fileInputRef}
 									type="file"
@@ -667,7 +782,7 @@ export default function SearchBar({
 									<button
 										type="button"
 										onClick={handleImageSearch}
-										disabled={loading}
+										disabled={loading || !selectedFile}
 										className="flex-1 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors font-medium flex items-center justify-center gap-2"
 									>
 										{loading ? (

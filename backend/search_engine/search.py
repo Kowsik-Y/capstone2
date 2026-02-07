@@ -117,23 +117,33 @@ async def search(
 
 async def search_by_image(engine, image: Image.Image, top_k: int = 10) -> Dict[str, Any]:
     """Search by uploaded image with automatic text extraction and type detection"""
-    # Extract text from image using OCR handler
-    extracted_text = engine.ocr_handler.extract_text_from_image(image)
+    # First, try to extract text using LLM
+    extracted_text = engine.jewelry_utils.extract_text_with_llm(image)
     
     # Detect jewelry type using jewelry utils
     detected_type = engine.jewelry_utils.detect_jewelry_type(image)
     
-    # If we have extracted text, use hybrid search
-    if extracted_text:
-        # Build query from extracted text and detected type
-        query = extracted_text
-        if detected_type:
-            query = f"{detected_type} {extracted_text}"
-        
-        print(f"🔍 Searching with extracted text: '{query}'")
-        return await search_by_image_and_text(engine, image, query, top_k)
+    # If we have both text AND detected jewelry, use hybrid search
+    if extracted_text and detected_type:
+        print(f"🔍 Text + Jewelry detected - Hybrid search: '{extracted_text}' + {detected_type} image")
+        return await search_by_image_and_text(engine, image, extracted_text, top_k, detected_type)
     
-    # Otherwise, use pure image similarity
+    # If we have extracted text only, search by text
+    if extracted_text:
+        print(f"🔍 Text detected - Searching by text: '{extracted_text}'")
+        return await search(
+            engine=engine,
+            query=extracted_text,
+            categories=None,  # Let it extract from text
+            top_k=top_k,
+            max_decoration_score=0.25,
+            min_plain_score=0.28,
+            semantic_top_k=100
+        )
+    
+    # Otherwise, if jewelry (ring/necklace) is detected, search by image
+    print(f"🔍 No text detected - Searching by image{f' (detected: {detected_type})' if detected_type else ''}")
+    
     # Embed the uploaded image
     img_embedding = engine.embedding_handler.embed_image(image)
     
@@ -170,18 +180,18 @@ async def search_by_image(engine, image: Image.Image, top_k: int = 10) -> Dict[s
         })
     
     return {
-        "query": extracted_text or "Image upload search",
-        "enhanced_query": f"Image search{f' (detected: {detected_type})' if detected_type else ''}{f' + text: {extracted_text}' if extracted_text else ''}",
-        "categories": list(set([r["category"] for r in formatted_results])),
+        "query": "Image search",
+        "enhanced_query": f"Image-based search{f' (filtered to: {detected_type})' if detected_type else ''}", 
+        "categories": [detected_type] if detected_type else list(set([r["category"] for r in formatted_results])),
         "negations": [],
         "results": formatted_results,
         "total_results": len(formatted_results),
-        "filter_stats": {"semantic_matches": len(results)}
+        "filter_stats": {"semantic_matches": len(results), "category_filter": detected_type if detected_type else "none"}
     }
 
 
 async def search_by_image_and_text(
-    engine, image: Image.Image, query: str, top_k: int = 10
+    engine, image: Image.Image, query: str, top_k: int = 10, detected_type: Optional[str] = None
 ) -> Dict[str, Any]:
     """Search by combining image and text embeddings"""
     # Embed the uploaded image using embedding handler
@@ -194,11 +204,35 @@ async def search_by_image_and_text(
     combined_embedding = 0.6 * img_embedding + 0.4 * text_embedding[0]
     combined_embedding = combined_embedding / np.linalg.norm(combined_embedding)
     
-    # Search
+    # Extract categories from query text OR use detected type
+    filter_categories = engine.query_processor.extract_categories(query)
+    
+    # If detected_type is provided and no category found in query, use detected_type
+    if detected_type and not filter_categories:
+        filter_categories = [detected_type]
+    elif detected_type and detected_type not in filter_categories:
+        # If detected type doesn't match extracted categories, use detected type
+        filter_categories = [detected_type]
+    
+    # Build category filter
+    search_filter = None
+    if filter_categories and len(filter_categories) < len(engine.categories):
+        # Only filter if we have specific categories (not all categories)
+        search_filter = Filter(
+            must=[
+                FieldCondition(
+                    key="category",
+                    match=MatchValue(value=filter_categories[0])  # Use first/main category
+                )
+            ]
+        )
+    
+    # Search with category filter
     results = engine.client.search(
         collection_name=engine.collection_name,
         query_vector=combined_embedding.tolist(),
-        limit=top_k
+        limit=top_k,
+        query_filter=search_filter
     )
     
     # Format results
@@ -215,10 +249,10 @@ async def search_by_image_and_text(
     
     return {
         "query": query,
-        "enhanced_query": f"Image + Text: {query}",
-        "categories": list(set([r["category"] for r in formatted_results])),
+        "enhanced_query": f"Image + Text: {query}{f' (filtered to: {filter_categories[0]})' if filter_categories and len(filter_categories) < len(engine.categories) else ''}",
+        "categories": filter_categories if filter_categories else list(set([r["category"] for r in formatted_results])),
         "negations": [],
         "results": formatted_results,
         "total_results": len(formatted_results),
-        "filter_stats": {"semantic_matches": len(results)}
+        "filter_stats": {"semantic_matches": len(results), "category_filter": filter_categories[0] if filter_categories and len(filter_categories) < len(engine.categories) else "none"}
     }
