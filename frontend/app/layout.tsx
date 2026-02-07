@@ -10,6 +10,7 @@ export const metadata: Metadata = {
 		"Search for jewelry using natural language queries powered by CLIP",
 };
 
+
 export default function RootLayout({
 	children,
 }: {
