@@ -4,7 +4,7 @@ Dependencies and shared utilities
 import os
 import torch
 from typing import Optional
-from clip_search import JewelrySearchEngine
+from search_engine import JewelrySearchEngine
 from download_dataset import download_dataset
 
 # Global search engine instance

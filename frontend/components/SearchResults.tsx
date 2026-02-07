@@ -69,24 +69,6 @@ function LazyImage({ result, index }: { result: SearchResult; index: number }) {
 					}`}
 				/>
 			)}
-			{index < 3 && (
-				<div className="absolute top-3 left-3 bg-gradient-to-br from-yellow-400 to-orange-500 text-white px-3 py-1 rounded-full font-bold text-sm shadow-lg flex items-center gap-1 z-10">
-					<Award className="w-4 h-4" />#{index + 1}
-				</div>
-			)}
-
-			{/* Similarity Score Badge */}
-			{result.similarity_score !== undefined && (
-				<div
-					className={cn(
-						"absolute top-3 right-3 px-3 py-1 rounded-full font-semibold text-sm shadow-lg z-10",
-						getScoreBgColor(result.similarity_score),
-						getScoreColor(result.similarity_score),
-					)}
-				>
-					{formatScore(result.similarity_score)}
-				</div>
-			)}
 		</div>
 	);
 }
@@ -132,10 +114,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
 								<span
 									className={cn(
 										"font-semibold",
-										getScoreColor(result.similarity_score),
+										getScoreColor(result.similarity_score * 2),
 									)}
 								>
-									{formatScore(result.similarity_score)}
+									{formatScore(result.similarity_score * 2)}
 								</span>
 							</div>
 
@@ -145,10 +127,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
 									<span
 										className={cn(
 											"font-semibold",
-											getScoreColor(result.plain_score),
+											getScoreColor(result.plain_score * 2),
 										)}
 									>
-										{formatScore(result.plain_score)}
+										{formatScore(result.plain_score * 2)}
 									</span>
 								</div>
 							)}
@@ -159,10 +141,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
 									<span
 										className={cn(
 											"font-semibold",
-											getScoreColor(1 - result.decoration_score),
+											getScoreColor(1 - result.decoration_score * 2),
 										)}
 									>
-										{formatScore(result.decoration_score)}
+										{formatScore(result.decoration_score * 2)}
 									</span>
 								</div>
 							)}
@@ -172,12 +154,14 @@ export default function SearchResults({ results }: SearchResultsProps) {
 						<div className="w-full bg-gray-200 rounded-full h-2">
 							<div
 								className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-500"
-								style={{ width: `${result.similarity_score * 100}%` }}
+								style={{
+									width: `${Math.min(result.similarity_score * 2 * 100, 100)}%`,
+								}}
 							/>
 						</div>
 					</div>
 				</Link>
-			))}
+			))}{" "}
 		</div>
 	);
 }

@@ -1,7 +1,8 @@
 "use client";
 
 import { CheckCircle2, ChevronDown, Filter, RotateCcw } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { getCategories } from "@/lib/api";
 import type { SearchFilters } from "@/types";
 
 interface FilterControlsProps {
@@ -20,8 +21,26 @@ export default function FilterControls({
 	onToggle,
 }: FilterControlsProps) {
 	const [internalIsExpanded, setInternalIsExpanded] = useState(false);
+	const [categories, setCategories] = useState<string[]>([]);
+	const [loadingCategories, setLoadingCategories] = useState(true);
 	const isExpanded =
 		externalIsExpanded !== undefined ? externalIsExpanded : internalIsExpanded;
+
+	useEffect(() => {
+		const fetchCategories = async () => {
+			try {
+				const data = await getCategories();
+				setCategories(data.categories);
+			} catch (error) {
+				console.error("Failed to fetch categories:", error);
+				// Fallback to default categories if API fails
+				setCategories(["ring", "necklace", "earrings", "bracelet"]);
+			} finally {
+				setLoadingCategories(false);
+			}
+		};
+		fetchCategories();
+	}, []);
 
 	const handleToggle = () => {
 		if (onToggle) {
@@ -110,34 +129,28 @@ export default function FilterControls({
 								Categories
 							</label>
 							<div className="space-y-2.5 max-h-48 overflow-y-auto pr-2">
-								{[
-									"ring",
-									"necklace",
-									"earrings",
-									"bracelet",
-									"bangle",
-									"pendant",
-									"chain",
-									"anklet",
-								].map((category) => (
-									<label
-										key={category}
-										className="flex items-center gap-3 cursor-pointer group p-2.5 rounded-lg hover:bg-white transition-all"
-									>
-										<input
-											type="checkbox"
-											checked={filters.categories.includes(category)}
-											onChange={() => handleCategoryToggle(category)}
-											className="w-5 h-5 text-purple-600 rounded border-2 border-gray-300 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 cursor-pointer transition-all"
-										/>
-										<span className="text-sm text-gray-700 capitalize font-medium group-hover:text-purple-600 transition-colors">
-											{category}
-										</span>
-									</label>
-								))}
+								{loadingCategories ? (
+									<div className="text-sm text-gray-500 p-2">Loading...</div>
+								) : (
+									categories.map((category) => (
+										<label
+											key={category}
+											className="flex items-center gap-3 cursor-pointer group p-2.5 rounded-lg hover:bg-white transition-all"
+										>
+											<input
+												type="checkbox"
+												checked={filters.categories.includes(category)}
+												onChange={() => handleCategoryToggle(category)}
+												className="w-5 h-5 text-purple-600 rounded border-2 border-gray-300 focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 cursor-pointer transition-all"
+											/>
+											<span className="text-sm text-gray-700 capitalize font-medium group-hover:text-purple-600 transition-colors">
+												{category}
+											</span>
+										</label>
+									))
+								)}
 							</div>
 						</div>
-
 						{/* Materials */}
 						<div className="space-y-3">
 							<label className="block text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
@@ -201,8 +214,11 @@ export default function FilterControls({
 
 						{/* Semantic Top K */}
 						<div className="space-y-3">
-							<label className="block text-sm font-bold text-gray-900 mb-3 flex items-center gap-2">
-								<div className="w-1 h-4 bg-gradient-to-b from-purple-500 to-indigo-500 rounded-full"></div>
+							<label
+								htmlFor="semanticTopK"
+								className="block text-sm font-bold text-gray-900 mb-3 items-center gap-2"
+							>
+								<div className="w-1 h-4 bg-gradient-to-b from-purple-500 to-indigo-500 rounded-full" />
 								Search Pool
 							</label>
 							<div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -215,6 +231,7 @@ export default function FilterControls({
 									</span>
 								</div>
 								<input
+									id="semanticTopK"
 									type="range"
 									min="50"
 									max="500"
@@ -242,7 +259,7 @@ export default function FilterControls({
 						<div className="space-y-3">
 							<label
 								htmlFor="maxDecoration"
-								className="block text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"
+								className="block text-sm font-bold text-gray-900 mb-3 items-center gap-2"
 							>
 								<div className="w-1 h-4 bg-gradient-to-b from-red-500 to-pink-500 rounded-full"></div>
 								Max Decoration
@@ -272,7 +289,7 @@ export default function FilterControls({
 						<div className="space-y-3">
 							<label
 								htmlFor="minPlain"
-								className="block text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"
+								className="block text-sm font-bold text-gray-900 mb-3 items-center gap-2"
 							>
 								<div className="w-1 h-4 bg-gradient-to-b from-green-500 to-emerald-500 rounded-full"></div>
 								Min Plain
@@ -303,7 +320,7 @@ export default function FilterControls({
 						<div className="space-y-3">
 							<label
 								htmlFor="maxResults"
-								className="block text-sm font-bold text-gray-900 mb-3 flex items-center gap-2"
+								className="block text-sm font-bold text-gray-900 mb-3 items-center gap-2"
 							>
 								<div className="w-1 h-4 bg-gradient-to-b from-blue-500 to-cyan-500 rounded-full"></div>
 								Max Results
@@ -333,6 +350,7 @@ export default function FilterControls({
 						{/* Apply Button */}
 						{onApply && (
 							<button
+								type="button"
 								onClick={onApply}
 								className="flex-1 px-6 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl hover:from-purple-700 hover:to-indigo-700 transition-all font-semibold shadow-lg shadow-purple-500/30 hover:shadow-xl flex items-center justify-center gap-2"
 							>
@@ -344,6 +362,7 @@ export default function FilterControls({
 						{/* Reset Button */}
 						{hasActiveFilters && (
 							<button
+								type="button"
 								onClick={() =>
 									onFiltersChange({
 										categories: [],

@@ -1,10 +1,8 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import Image from "next/image";
 import { useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useRef, useState } from "react";
-import FilterControls from "@/components/FilterControls";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import Navbar from "@/components/Navbar";
 import SearchBar from "@/components/SearchBar";
 import SearchResults from "@/components/SearchResults";
@@ -19,7 +17,6 @@ function SearchPageContent() {
 	const searchParams = useSearchParams();
 	const initialQuery = searchParams.get("q") || "";
 
-	const [allResults, setAllResults] = useState<SearchResponse | null>(null);
 	const [filteredResults, setFilteredResults] = useState<SearchResponse | null>(
 		null,
 	);
@@ -47,12 +44,70 @@ function SearchPageContent() {
 		semanticTopK: 100,
 	});
 	const [isFilterOpen, setIsFilterOpen] = useState(false);
+	const [currentQuery, setCurrentQuery] = useState<string>(initialQuery);
 
 	const loadMoreRef = useRef<HTMLDivElement>(null);
 
-	const applyFilters = () => {
-		setFilters(tempFilters);
-	};
+	const handleSearch = useCallback(
+		async (query: string, useFilters?: SearchFilters) => {
+			setLoading(true);
+			// Update current query when search happens
+			setCurrentQuery(query);
+			try {
+				const activeFilters = useFilters || filters;
+				let enhancedQuery = query;
+				if (
+					activeFilters.materials.length > 0 ||
+					activeFilters.stones.length > 0
+				) {
+					const filterTerms = [
+						...activeFilters.materials,
+						...activeFilters.stones,
+					];
+					enhancedQuery = `${query} with ${filterTerms.join(" ")}`.trim();
+				}
+
+				const response = await searchJewelry({
+					query: enhancedQuery,
+					categories:
+						activeFilters.categories.length > 0
+							? activeFilters.categories
+							: undefined,
+					top_k: 50, // Maximum allowed by backend
+					max_decoration_score: activeFilters.maxDecorationScore,
+					min_plain_score: activeFilters.minPlainScore,
+					semantic_top_k: activeFilters.semanticTopK,
+				});
+
+				setFilteredResults(response);
+				setDisplayCount(20); // Reset to show first 20
+			} catch (error) {
+				console.error("Search error:", error);
+				alert("Search failed. Please try again.");
+			} finally {
+				setLoading(false);
+			}
+		},
+		[filters],
+	);
+
+	const applyFilters = useCallback(
+		async (queryFromSearchBar: string) => {
+			// Use the query from search bar, it's always current since it's controlled
+			const searchQuery = queryFromSearchBar.trim();
+			
+			// If no query, don't proceed
+			if (!searchQuery) {
+				return;
+			}
+			
+			// Sync tempFilters to filters before searching
+			setFilters(tempFilters);
+			// Use the tempFilters directly to ensure we search with current state
+			await handleSearch(searchQuery, tempFilters);
+		},
+		[tempFilters, handleSearch],
+	);
 
 	// Load all featured items on mount
 	useEffect(() => {
@@ -60,48 +115,25 @@ function SearchPageContent() {
 			setLoading(true);
 			try {
 				const response = await getFeaturedItems(100);
-				setAllResults(response);
 				setFilteredResults(response);
 			} catch (error) {
-				console.error("Failed to load items:", error);
+				console.error("Featured items error:", error);
+				alert("Failed to load items. Please try again.");
 			} finally {
 				setLoading(false);
 			}
 		};
 
 		if (initialQuery) {
-			handleSearch(initialQuery);
+			// Use setTimeout to ensure handleSearch is defined
+			setTimeout(() => handleSearch(initialQuery), 0);
 		} else {
 			loadAllItems();
 		}
-	}, []);
+	}, [initialQuery, handleSearch]);
 
-	// Apply filters to results
-	useEffect(() => {
-		if (!allResults) return;
-
-		let filtered = [...allResults.results];
-
-		// Apply category filter
-		if (filters.categories.length > 0) {
-			filtered = filtered.filter((item) =>
-				filters.categories.includes(item.category.toLowerCase()),
-			);
-		}
-
-		// Note: maxDecorationScore and minPlainScore are applied on backend during search
-		// They don't affect the featured items display, only search results
-
-		setFilteredResults({
-			...allResults,
-			results: filtered,
-		});
-
-		// Reset display count when filters change
-		setDisplayCount(20);
-	}, [filters.categories, allResults]);
-
-	// Update displayed results based on display count
+	// Update displayed results based on display count (pagination)
+	// All filtering is done on backend, not client-side
 	useEffect(() => {
 		if (!filteredResults) return;
 
@@ -144,41 +176,32 @@ function SearchPageContent() {
 		};
 	}, [displayCount, filteredResults, loadingMore]);
 
-	const handleSearch = async (query: string) => {
-		setLoading(true);
-
-		try {
-			const response = await searchJewelry({
-				query,
-				categories:
-					filters.categories.length > 0 ? filters.categories : undefined,
-				top_k: 50, // Maximum allowed by backend
-				max_decoration_score: filters.maxDecorationScore,
-				min_plain_score: filters.minPlainScore,
-				semantic_top_k: filters.semanticTopK,
-			});
-			setAllResults(response);
-			setFilteredResults(response);
-			setDisplayCount(20); // Reset to show first 20
-		} catch (error) {
-			console.error("Search error:", error);
-			alert("Search failed. Please try again.");
-		} finally {
-			setLoading(false);
-		}
-	};
-
 	const handleImageUpload = async (file: File, query?: string) => {
 		setLoading(true);
 
 		try {
+			// Sync tempFilters to filters before searching
+			setFilters(tempFilters);
+			
+			// Build enhanced query: preserve original intent, add filter terms as modifiers
+			let enhancedQuery = query || "";
+			if (tempFilters.materials.length > 0 || tempFilters.stones.length > 0) {
+				const filterTerms = [...tempFilters.materials, ...tempFilters.stones];
+				// Add filter terms to refine the query (not replace it)
+				if (enhancedQuery) {
+					enhancedQuery =
+						`${enhancedQuery} with ${filterTerms.join(" ")}`.trim();
+				} else {
+					enhancedQuery = filterTerms.join(" ");
+				}
+			}
+
 			const response = await uploadImageWithText(
 				file,
-				query,
+				enhancedQuery || undefined,
 				50, // Maximum allowed by backend
-				filters.categories.length > 0 ? filters.categories : undefined,
+				tempFilters.categories.length > 0 ? tempFilters.categories : undefined,
 			);
-			setAllResults(response);
 			setFilteredResults(response);
 			setDisplayCount(20); // Reset to show first 20
 		} catch (error) {
@@ -204,38 +227,22 @@ function SearchPageContent() {
 					</p>
 				</div>
 
-				{/* Search Bar */}
-				<div className="mb-8">
+				{/* Search Box with Integrated Filters */}
+				<div className="max-w-4xl mx-auto mb-8">
+					{/* Search Bar */}
 					<SearchBar
 						onSearch={handleSearch}
 						onImageUpload={handleImageUpload}
 						loading={loading}
-						initialQuery={initialQuery}
-						onFilterToggle={() => setIsFilterOpen(!isFilterOpen)}
-						isFilterOpen={isFilterOpen}
-					/>
-				</div>
-
-				{/* Filters - Positioned near search */}
-				<div className="mb-10">
-					<FilterControls
+						query={currentQuery}
+						onQueryChange={setCurrentQuery}
 						filters={tempFilters}
 						onFiltersChange={setTempFilters}
-						onApply={() => {
-							applyFilters();
-							setIsFilterOpen(false);
-						}}
+						onApply={applyFilters}
 						isExpanded={isFilterOpen}
 						onToggle={() => setIsFilterOpen(!isFilterOpen)}
 					/>
 				</div>
-
-				{/* Loading State */}
-				{loading && (
-					<div className="flex items-center justify-center py-20">
-						<div className="text-center"></div>
-					</div>
-				)}
 
 				{/* Search Results */}
 				{!loading && displayedResults && (
@@ -258,8 +265,8 @@ function SearchPageContent() {
 								displayedResults.categories.length > 0 ||
 								displayedResults.negations.length > 0) && (
 								<button
+									type="button"
 									onClick={() => {
-										setAllResults(null);
 										setFilteredResults(null);
 										setDisplayedResults(null);
 										setDisplayCount(20);
