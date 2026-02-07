@@ -114,10 +114,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
 								<span
 									className={cn(
 										"font-semibold",
-										getScoreColor(result.similarity_score * 2),
+										getScoreColor(result.similarity_score),
 									)}
 								>
-									{formatScore(result.similarity_score * 2)}
+									{formatScore(result.similarity_score)}
 								</span>
 							</div>
 
@@ -127,10 +127,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
 									<span
 										className={cn(
 											"font-semibold",
-											getScoreColor(result.plain_score * 2),
+											getScoreColor(result.plain_score ),
 										)}
 									>
-										{formatScore(result.plain_score * 2)}
+										{formatScore(result.plain_score)}
 									</span>
 								</div>
 							)}
@@ -141,10 +141,10 @@ export default function SearchResults({ results }: SearchResultsProps) {
 									<span
 										className={cn(
 											"font-semibold",
-											getScoreColor(1 - result.decoration_score * 2),
+											getScoreColor(1 - result.decoration_score),
 										)}
 									>
-										{formatScore(result.decoration_score * 2)}
+										{formatScore(result.decoration_score)}
 									</span>
 								</div>
 							)}
@@ -155,7 +155,7 @@ export default function SearchResults({ results }: SearchResultsProps) {
 							<div
 								className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-500"
 								style={{
-									width: `${Math.min(result.similarity_score * 2 * 100, 100)}%`,
+									width: `${Math.min(result.similarity_score * 100, 100)}%`,
 								}}
 							/>
 						</div>
