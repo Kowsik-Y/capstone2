@@ -405,7 +405,4 @@ This project is part of a capstone project and is for educational purposes.
 ## 📧 Contact
 
 For questions or support, please open an issue in the repository.
-
 ---
-
-**Built with ❤️ for Capstone Project 2**
